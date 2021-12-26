@@ -66,7 +66,7 @@ namespace ardb
         if (m_waiting_num > 0)
         {
             uint32_t num = m_waiting_num;
-            char buf[num];
+            char buf[num]="";
             if (write(m_write_fd, buf, num))
             {
             }

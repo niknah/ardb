@@ -195,7 +195,7 @@ OP_NAMESPACE_BEGIN
             {
                 if (NULL != migrate_reply->at(i))
                 {
-                    WARN_LOG("Migrate chunk failed with reason:%s", restore_reply->Error().c_str());
+                    WARN_LOG("Migrate chunk failed with reason:%s", migrate_reply->at(i)->Error().c_str());
                     r.SetErrorReason(migrate_reply->at(i)->Error());
                 }
                 goto _coro_exit;

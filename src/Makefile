@@ -40,6 +40,7 @@ uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
 uname_M := $(shell sh -c 'uname -m 2>/dev/null || echo not')
 
 LIB_PATH=$(PWD)/../deps
+BIN_INSTALL_PATH=$(PWD)/../bin/
 
 JEMALLOC_VER=5.2.1
 JEMALLOC_PATH=${LIB_PATH}/jemalloc-${JEMALLOC_VER}
@@ -47,25 +48,23 @@ JEMALLOC_FILE=${JEMALLOC_PATH}.tar.bz2
 JEMALLOC_REMOTE_FILE=https://github.com/jemalloc/jemalloc/releases/download/${JEMALLOC_VER}/jemalloc-${JEMALLOC_VER}.tar.bz2
 JEMALLOC_LIBA=${JEMALLOC_PATH}/lib/libjemalloc.a
 
-SNAPPY_VER=1.1.4
-SNAPPY_PATH=${LIB_PATH}/snappy-${SNAPPY_VER}
-SNAPPY_FILE=${SNAPPY_PATH}.tar.gz
-SNAPPY_REMOTE_FILE=https://github.com/google/snappy/releases/download/${SNAPPY_VER}/snappy-${SNAPPY_VER}.tar.gz
-SNAPPY_LIBA=${SNAPPY_PATH}/.libs/libsnappy.a
+SNAPPY_VER=1.1.9
+SNAPPY_REMOTE_REPO=https://github.com/google/snappy.git
+SNAPPY_PATH=${LIB_PATH}/snappy
+SNAPPY_LIBA=${SNAPPY_PATH}/build/libsnappy.a
 
-ROCKSDB_VER=6.26.1
+ROCKSDB_VER=6.27.3
 ROCKSDB_PATH=${LIB_PATH}/rocksdb-${ROCKSDB_VER}
 ROCKSDB_REMOTE_FILE=https://github.com/facebook/rocksdb/archive/v${ROCKSDB_VER}.tar.gz
 ROCKSDB_FILE=${ROCKSDB_PATH}.tar.gz
 ROCKSDB_LIBA=${ROCKSDB_PATH}/librocksdb.a
 
-LEVELDB_VER=1.20
-LEVELDB_PATH=${LIB_PATH}/leveldb-${LEVELDB_VER}
-LEVELDB_FILE=${LEVELDB_PATH}.tar.gz
-LEVELDB_REMOTE_FILE=https://github.com/google/leveldb/archive/v${LEVELDB_VER}.tar.gz
-LEVELDB_LIBA=${LEVELDB_PATH}/out-static/libleveldb.a
+LEVELDB_VER=1.23
+LEVELDB_PATH=${LIB_PATH}/leveldb
+LEVELDB_REMOTE_REPO=https://github.com/google/leveldb.git
+LEVELDB_LIBA=${LEVELDB_PATH}/build/libleveldb.a
 
-LMDB_VER=0.9.21
+LMDB_VER=0.9.29
 LMDB_PATH=${LIB_PATH}/lmdb-LMDB_${LMDB_VER}/libraries/liblmdb
 LMDB_FILE=${LIB_PATH}/lmdb-${LMDB_VER}.tar.gz
 LMDB_REMOTE_FILE=https://github.com/LMDB/lmdb/archive/LMDB_${LMDB_VER}.tar.gz
@@ -78,11 +77,11 @@ FORESTDB_REMOTE_FILE=https://github.com/couchbase/forestdb/archive/v1.2.tar.gz
 FORESTDB_SO=${FORESTDB_PATH}/build/libforestdb.so
 FORESTDB_LIBA=${FORESTDB_PATH}/build/libforestdb.a
 
-WIREDTIGER_VER=3.0.0
+WIREDTIGER_VER=10.0.0
 WIREDTIGER_PATH=${LIB_PATH}/wiredtiger-${WIREDTIGER_VER}
 WIREDTIGER_FILE=${WIREDTIGER_PATH}.tar.bz2
 WIREDTIGER_REMOTE_FILE=https://github.com/wiredtiger/wiredtiger/releases/download/${WIREDTIGER_VER}/wiredtiger-${WIREDTIGER_VER}.tar.bz2
-WIREDTIGER_LIBA=${WIREDTIGER_PATH}/.libs/libwiredtiger_static.a
+WIREDTIGER_LIBA=${WIREDTIGER_PATH}/.libs/libwiredtiger.a
 
 PERCONAFT_VER=PerconaFT-master
 PERCONAFT_PATH=${LIB_PATH}/${PERCONAFT_VER}
@@ -91,7 +90,7 @@ PERCONAFT_REMOTE_FILE=https://github.com/percona/PerconaFT/archive/master.zip
 PERCONAFT_LIBA=${PERCONAFT_PATH}/prefix/lib/libtokufractaltree_static.a
 PERCONAFT_LIBA2=${PERCONAFT_PATH}/prefix/lib/libtokuportability_static.a
 
-ZOOKEEPER_VER=zookeeper-3.4.5
+ZOOKEEPER_VER=zookeeper-3.6.3
 ZOOKEEPER_PATH=${LIB_PATH}/${ZOOKEEPER_VER}
 ZOOKEEPER_FILE=${ZOOKEEPER_PATH}.tar.gz
 ZOOKEEPER_LIBA=${ZOOKEEPER_PATH}/.libs/libzkst.a
@@ -101,6 +100,8 @@ SPARSEHASH_VER=sparsehash-sparsehash-2.0.4
 SPARSEHASH_PATH=${LIB_PATH}/${SPARSEHASH_VER}
 SPARSEHASH_FILE=${SPARSEHASH_PATH}.tar.gz
 SPARSEHASH_CONFIG=${SPARSEHASH_PATH}/src/config.h
+
+ALL_STORAGE_ENGINES=wiredtiger perconaft forestdb lmdb leveldb rocksdb
 
 # Cross compiling variables
 XC_HOST=
@@ -224,7 +225,8 @@ ifeq ($(storage_engine), leveldb)
   STORAGE_ENGINE_PATH=$(LEVELDB_PATH)
   INCS+=-I${LEVELDB_PATH}/include
   LIBS:=${LEVELDB_LIBA} ${SNAPPY_LIBA} ${LIBS}
-  CXXFLAGS+=-D__USE_LEVELDB__
+  # leveldb v1.23+ needs -fno-rtti
+  CXXFLAGS+=-fno-rtti -D__USE_LEVELDB__
 else
 ifeq ($(storage_engine), forestdb)
   STORAGE_ENGINE=$(FORESTDB_LIBA)
@@ -291,6 +293,12 @@ endif
 
 all: ${PREBUILD}  test server tools
 
+storage_engine: all
+	mkdir -p $(BIN_INSTALL_PATH)$(storage_engine) && cp ardb-* $(BIN_INSTALL_PATH)$(storage_engine)/
+
+all_storage_engines:
+	$(foreach var,$(ALL_STORAGE_ENGINES),rm src/db/engine.o $(STORAGE_ENGINE_ALL_OBJ) $(DIST_LIBA); storage_engine=$(var) make storage_engine || exit; )
+
 $(STORAGE_ENGINE_OBJ): $(STORAGE_ENGINE)
 
 $(DIST_LIB): $(STORAGE_ENGINE_OBJ) $(CORE_OBJECTS)
@@ -331,26 +339,30 @@ ${JEMALLOC_FILE}:
 	echo ">>>>> Dowloading JEMALLOC" && \
 	cd ${LIB_PATH} && \
 	wget -O ${JEMALLOC_FILE} ${JEMALLOC_REMOTE_FILE} && \
-	echo "<<<<< Done dowloading JEMALLOC"
+	echo "<<<<< Done downloading JEMALLOC"
 
 .PHONY: snappy
 snappy: $(SNAPPY_LIBA)
 $(SNAPPY_LIBA):$(SNAPPY_PATH)
 	echo ">>>>> Building SNAPPY" && \
 	cd ${SNAPPY_PATH} && \
-	./configure CXXFLAGS="$(SNAPPY_CXXFLAGS=)" ${XC_BUILD} ${XC_HOST} ${XC_TGT} > configure.out && \
-	$(MAKE) libsnappy.la && \
+	git submodule update --init && \
+	mkdir build && \
+	cd build && cmake ../ && make
 	echo "<<<<< Done building SNAPPY"
 
-$(SNAPPY_PATH): $(SNAPPY_FILE)
+$(SNAPPY_PATH): 
 	cd ${LIB_PATH} && \
-	tar zxf ${SNAPPY_FILE}
+	git clone ${SNAPPY_REMOTE_REPO} && \
+	cd ${SNAPPY_PATH} && \
+	git checkout "${SNAPPY_VER}"
+
 
 ${SNAPPY_FILE}:
 	echo ">>>>> Dowloading Snappy" && \
 	cd ${LIB_PATH} && \
 	wget -O ${SNAPPY_FILE} ${SNAPPY_REMOTE_FILE} && \
-	echo "<<<<< Done dowloading Snappy"
+	echo "<<<<< Done downloading Snappy"
 
 .PHONY: lmdb
 lmdb: $(LMDB_LIBA)
@@ -370,31 +382,39 @@ ${LMDB_FILE}:
 	echo ">>>>> Dowloading LMDB" && \
 	cd ${LIB_PATH} && \
 	wget -O ${LMDB_FILE} ${LMDB_REMOTE_FILE} && \
-	echo "<<<<< Done dowloading LMDB"
+	echo "<<<<< Done downloading LMDB"
 
 .PHONY: leveldb
 leveldb: $(LEVELDB_LIBA)
 $(LEVELDB_LIBA): $(SNAPPY_LIBA) $(LEVELDB_PATH)
 	echo ">>>>> Building LEVELDB" && \
 	cd ${LEVELDB_PATH} && \
-	OPT="$(LEVELDB_OPT)" \
-	CXXFLAGS="-I${SNAPPY_PATH} -fno-access-control" \
-		CFLAGS="-I${SNAPPY_PATH}" \
-		LDFLAGS="${SNAPPY_PATH}/.libs" \
-		$(MAKE) out-static/libleveldb.a && \
+	mkdir -p build && cd build && \
+	cmake -DCMAKE_BUILD_TYPE=Release .. && cmake --build .
 	echo "<<<<< Done building LEVELDB"
 
-$(LEVELDB_PATH): ${LEVELDB_FILE}
+
+#	OPT="$(LEVELDB_OPT)" \
+#	CXXFLAGS="-I${SNAPPY_PATH} -fno-access-control" \
+#		CFLAGS="-I${SNAPPY_PATH}" \
+#		LDFLAGS="${SNAPPY_PATH}/.libs" \
+#		$(MAKE) out-static/libleveldb.a && \
+#	${LEVELDB_FILE}
+
+$(LEVELDB_PATH): 
 	echo ">>>>> Unpacking LEVELDB" && \
 	cd ${LIB_PATH} && \
-	tar zxf ${LEVELDB_FILE} && \
+	git clone --recurse-submodules ${LEVELDB_REMOTE_REPO} && \
+	cd ${LEVELDB_PATH} && \
+	git checkout ${LEVELDB_VER} && \
 	echo "<<<<< Done unpacking LEVELDB"
 
-${LEVELDB_FILE}:
-	echo ">>>>> Dowloading LevelDB" && \
-	cd ${LIB_PATH} && \
-	wget -O ${LEVELDB_FILE} ${LEVELDB_REMOTE_FILE} && \
-	echo "<<<<< Done dowloading LevelDB"
+#	tar zxf ${LEVELDB_FILE} && \
+#${LEVELDB_FILE}:
+#	echo ">>>>> Dowloading LevelDB" && \
+#	cd ${LIB_PATH} && \
+#	wget -O ${LEVELDB_FILE} ${LEVELDB_REMOTE_FILE} && \
+#	echo "<<<<< Done downloading LevelDB"
 
 .PHONY: rocksdb
 rocksdb: $(ROCKSDB_LIBA) rocksdb_flags
@@ -420,14 +440,14 @@ ${ROCKSDB_FILE}:
 	@echo ">>>>> Dowloading RocksDB" && \
 	cd ${LIB_PATH} && \
 	wget -O ${ROCKSDB_FILE} ${ROCKSDB_REMOTE_FILE} && \
-	echo "<<<<< Done dowloading RocksDB"
+	echo "<<<<< Done downloading RocksDB"
 
 .PHONY: wiredtiger
 wiredtiger: $(WIREDTIGER_LIBA)
 $(WIREDTIGER_LIBA): $(SNAPPY_LIBA) $(WIREDTIGER_PATH)
-	@echo ">>>>> Building WiredTiger" && \
+	@echo ">>>>> Building WiredTiger $(WIREDTIGER_LIBA)" && \
 	cd ${WIREDTIGER_PATH} && \
-	./configure && $(MAKE) libwiredtiger_static.la && \
+	./configure && $(MAKE) && \
 	echo "<<<<< Done building WiredTiger"
 
 $(WIREDTIGER_PATH): ${WIREDTIGER_FILE}
@@ -440,7 +460,7 @@ ${WIREDTIGER_FILE}:
 	@echo ">>>>> Dowloading WiredTiger" && \
 	cd ${LIB_PATH} && \
 	wget -O ${WIREDTIGER_FILE} ${WIREDTIGER_REMOTE_FILE} && \
-	echo "<<<<< Done dowloading WiredTiger"
+	echo "<<<<< Done downloading WiredTiger"
 
 .PHONY: forestdb
 forestdb: $(FORESTDB_LIBA)
@@ -465,16 +485,16 @@ ${FORESTDB_FILE}:
 	echo ">>>>> Dowloading forestdb" && \
 	cd ${LIB_PATH} && \
 	wget -O ${FORESTDB_FILE} ${FORESTDB_REMOTE_FILE} && \
-	echo "<<<<< Done dowloading forestdb"
+	echo "<<<<< Done downloading forestdb"
 
 .PHONY: perconaft
 perconaft: $(PERCONAFT_LIBA)
 $(PERCONAFT_LIBA): ${PERCONAFT_PATH} $(SNAPPY_LIBA)
 	echo ">>>>> Building PerconaFT" && \
 	cd ${LIB_PATH} && \
-	cd ${PERCONAFT_PATH} && rm -rf build &&\
-	mkdir -p build && cd build &&\
-	cmake -D CMAKE_BUILD_TYPE=Debug -D BUILD_TESTING=OFF -D USE_VALGRIND=OFF -D CMAKE_INSTALL_PREFIX=../prefix/ ../ && $(MAKE) && $(MAKE) install &&\
+	cd ${PERCONAFT_PATH} && rm -rf build && \
+	mkdir -p build && cd build && \
+	cmake -D CMAKE_BUILD_TYPE=Debug -D BUILD_TESTING=OFF -D USE_VALGRIND=OFF -D CMAKE_INSTALL_PREFIX=../prefix/ ../ && cmake --build . --target install && \
 	echo "<<<<< Done building PerconaFT"
 
 ${PERCONAFT_PATH}: ${PERCONAFT_FILE}
@@ -487,7 +507,7 @@ ${PERCONAFT_FILE}:
 	echo ">>>>> Dowloading PerconaFT" && \
 	cd ${LIB_PATH} && \
 	wget -O ${PERCONAFT_FILE} ${PERCONAFT_REMOTE_FILE} && \
-	echo "<<<<< Done dowloading PerconaFT"
+	echo "<<<<< Done downloading PerconaFT"
 
 .PHONY: lua
 lua: $(LUA_LIBA)

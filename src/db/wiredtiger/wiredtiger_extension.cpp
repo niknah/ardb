@@ -193,7 +193,7 @@ static int snappy_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *confi
         return (errno);
 
     snappy_compressor->compressor.compress = wt_snappy_compress;
-    snappy_compressor->compressor.compress_raw = NULL;
+//    snappy_compressor->compressor.compress_raw = NULL;
     snappy_compressor->compressor.decompress = wt_snappy_decompress;
     snappy_compressor->compressor.pre_size = wt_snappy_pre_size;
     snappy_compressor->compressor.terminate = wt_snappy_terminate;

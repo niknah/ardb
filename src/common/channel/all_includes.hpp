@@ -75,7 +75,7 @@ namespace ardb
 		RETURN_FALSE_IF_NULL(ctx);
 
 		ChannelHandler* base = ctx->GetHandler();
-		ChannelUpstreamHandler<T> * handler = dynamic_cast<ChannelUpstreamHandler<T>*>(base);
+		ChannelUpstreamHandler<T> * handler = static_cast<ChannelUpstreamHandler<T>*>(base);
 		//ChannelUpstreamHandler<T> * handler = NULL;
 		//if (ChannelHandlerHelper<T>::CanHandleUpMessageEvent(base))
 		//{
