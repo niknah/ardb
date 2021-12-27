@@ -32,6 +32,9 @@
 #if defined __USE_LMDB__
 #include "lmdb/lmdb_engine.hpp"
 const char* ardb::g_engine_name = "lmdb";
+#elif defined __USE_LMDBX__
+#include "lmdbx/lmdbx_engine.hpp"
+const char* ardb::g_engine_name ="lmdbx";
 #elif defined __USE_ROCKSDB__
 #include "rocksdb/rocksdb_engine.hpp"
 const char* ardb::g_engine_name ="rocksdb";
@@ -58,6 +61,8 @@ Engine* create_engine()
     Engine* engine = NULL;
 #if defined __USE_LMDB__
     NEW(engine, LMDBEngine);
+#elif defined __USE_LMDBX__
+    NEW(engine, LMDBXEngine);
 #elif defined __USE_ROCKSDB__
     NEW(engine, RocksDBEngine);
 #elif defined __USE_LEVELDB__

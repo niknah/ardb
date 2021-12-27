@@ -70,6 +70,13 @@ LMDB_FILE=${LIB_PATH}/lmdb-${LMDB_VER}.tar.gz
 LMDB_REMOTE_FILE=https://github.com/LMDB/lmdb/archive/LMDB_${LMDB_VER}.tar.gz
 LMDB_LIBA=${LMDB_PATH}/liblmdb.a
 
+
+LMDBX_VER=0.11.2
+LMDBX_PATH=${LIB_PATH}/lmdbx
+LMDBX_FILE=${LIB_PATH}/lmdbx-amalgamated-${LMDBX_VER}.tar.gz
+LMDBX_REMOTE_FILE=https://github.com/erthink/libmdbx/releases/download/v${LMDBX_VER}/libmdbx-amalgamated-${LMDBX_VER}.tar.gz
+LMDBX_LIBA=${LMDBX_PATH}/libmdbx.a
+
 FORESTDB_VER=forestdb-1.2
 FORESTDB_PATH=${LIB_PATH}/${FORESTDB_VER}
 FORESTDB_FILE=${LIB_PATH}/${FORESTDB_VER}.tar.gz
@@ -250,6 +257,13 @@ ifeq ($(storage_engine), lmdb)
   LIBS:= ${LMDB_LIBA} ${SNAPPY_LIBA} ${LIBS}
   CXXFLAGS+=-D__USE_LMDB__
 else
+ifeq ($(storage_engine), lmdbx)
+  STORAGE_ENGINE=$(LMDBX_LIBA)
+  STORAGE_ENGINE_PATH=$(LMDBX_PATH)
+  INCS+=-I${LMDBX_PATH}
+  LIBS:= ${LMDBX_LIBA} ${SNAPPY_LIBA} ${LIBS}
+  CXXFLAGS+=-D__USE_LMDBX__ -Wno-deprecated-declarations
+else
 ifeq ($(storage_engine), rocksdb)
   STORAGE_ENGINE=$(ROCKSDB_LIBA)
   STORAGE_ENGINE_PATH=$(ROCKSDB_PATH)
@@ -273,6 +287,7 @@ ifeq ($(storage_engine), perconaft)
   CXXFLAGS+=-D__USE_PERCONAFT__
 else
   $(error Only leveldb/lmdb/rocksdb/perconaft/wiredtiger/forestdb supported as env storage_engine value)
+endif
 endif
 endif
 endif
@@ -383,6 +398,28 @@ ${LMDB_FILE}:
 	cd ${LIB_PATH} && \
 	wget -O ${LMDB_FILE} ${LMDB_REMOTE_FILE} && \
 	echo "<<<<< Done downloading LMDB"
+
+
+
+.PHONY: lmdbx
+lmdbx: $(LMDBX_LIBA)
+$(LMDBX_LIBA): $(LMDBX_PATH)
+	echo ">>>>> Building LMDBX" && \
+	cd ${LMDBX_PATH} && \
+	$(MAKE) && \
+	echo "<<<<< Done building LMDBX"
+
+$(LMDBX_PATH): $(LMDBX_FILE)
+	echo ">>>>> Unpacking LMDBX" && \
+	mkdir ${LMDBX_PATH} && cd ${LMDBX_PATH} && \
+	tar zxf ${LMDBX_FILE} && \
+	echo "<<<<< Done unpacking LMDBX"
+
+${LMDBX_FILE}:
+	echo ">>>>> Dowloading LMDBX" && \
+	cd ${LIB_PATH} && \
+	wget -O ${LMDBX_FILE} ${LMDBX_REMOTE_FILE} && \
+	echo "<<<<< Done downloading LMDBX"
 
 .PHONY: leveldb
 leveldb: $(LEVELDB_LIBA)
